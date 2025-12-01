@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String
+  name              String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  profile           Json?
+  futureSelfCard    FutureSelfCard?
+  journalEntries    JournalEntry[]
+  promptPreferences PromptPreference?
+  promptHistory     PromptHistory[]
+  scaffoldResponses ScaffoldResponse[]
+  marginNotes       MarginNote[]
+  reflectionQuestions ReflectionQuestion[]
+  patternSummaries  PatternSummary[]
+  accounts          Account[]
+  sessions          Session[]
+
+  @@index([createdAt])
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model FutureSelfCard {
+  id           String         @id @default(cuid())
+  userId       String         @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  values       String[]
+  sixMonthGoal String
+  fiveYearGoal String
+  constraints  String
+  antiGoals    String
+  identityStmt String
+  revisions    CardRevision[]
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CardRevision {
+  id         String         @id @default(cuid())
+  cardId     String
+  editedAt   DateTime       @default(now())
+  snapshot   Json
+  annotation String
+  card       FutureSelfCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, editedAt])
+}
+
+model JournalEntry {
+  id                String             @id @default(cuid())
+  userId            String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  content           String
+  marginNotes       MarginNote[]
+  reflectionQuestions ReflectionQuestion[]
+  patternSummaries  PatternSummary[]
+  scaffoldResponses ScaffoldResponse[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model PromptPreference {
+  id         String           @id @default(cuid())
+  userId     String           @unique
+  frequency  PromptFrequency
+  categories PromptCategory[]
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PromptHistory {
+  id         String         @id @default(cuid())
+  userId     String
+  promptType PromptCategory
+  cardField  String
+  promptText String
+  shownAt    DateTime       @default(now())
+  responded  Boolean        @default(false)
+  responseId String?
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, shownAt])
+}
+
+model MarginNote {
+  id          String         @id @default(cuid())
+  entryId     String
+  userId      String
+  category    MarginNoteCategory
+  summary     String
+  body        String
+  provenance  Json
+  supportsCardEdit Json?
+  generatedAt DateTime       @default(now())
+  entry       JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+}
+
+model ReflectionQuestion {
+  id             String       @id @default(cuid())
+  entryId        String
+  userId         String
+  text           String
+  anchorSentence String?
+  cardElement    String?
+  createdAt      DateTime     @default(now())
+  entry          JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ScaffoldResponse {
+  id        String       @id @default(cuid())
+  userId    String
+  entryId   String
+  schemaId  String
+  answers   Json
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model PatternSummary {
+  id          String       @id @default(cuid())
+  entryId     String
+  userId      String
+  generatedAt DateTime     @default(now())
+  summary     Json
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+}
+
+enum PromptFrequency {
+  DAILY
+  THREE_PER_WEEK
+  WEEKLY
+  OFF
+}
+
+enum PromptCategory {
+  VALUE
+  TEMPORAL
+  ANTI_GOAL
+  CONSTRAINT
+  GOAL
+}
+
+enum MarginNoteCategory {
+  CARD_TENSION
+  TEMPORAL_PATTERN
+  VALIDATED_CONSTRAINT
+  OPEN_QUESTION
+}
