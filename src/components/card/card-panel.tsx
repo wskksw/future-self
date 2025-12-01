@@ -6,6 +6,13 @@ import type { CardRevision, FutureSelfCard } from "@prisma/client";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { HistorySheet } from "@/components/card/history";
+import {
+  calculateFieldStats,
+  shouldShowStabilityIndicator,
+  getStabilityDots,
+  type CardSnapshot,
+} from "@/lib/card-history";
 import {
   Card,
   CardContent,
@@ -199,32 +206,77 @@ export function CardPanel({
     }
   }
 
+  // Calculate field stability stats from revisions
+  const fieldStats = useMemo(() => {
+    if (!card?.revisions) return null;
+    const currentCard: CardSnapshot = {
+      values: card.values,
+      sixMonthGoal: card.sixMonthGoal,
+      fiveYearGoal: card.fiveYearGoal,
+      constraints: card.constraints,
+      antiGoals: card.antiGoals,
+      identityStmt: card.identityStmt,
+    };
+    return calculateFieldStats(card.revisions, currentCard);
+  }, [card]);
+
+  // Helper to render stability indicator
+  const StabilityBadge = ({ field }: { field: keyof CardSnapshot }) => {
+    if (!fieldStats || !shouldShowStabilityIndicator(fieldStats[field])) return null;
+    return (
+      <span
+        className="ml-2 text-xs text-primary"
+        title={`Edited ${fieldStats[field]} times`}
+      >
+        {getStabilityDots(fieldStats[field])}
+      </span>
+    );
+  };
+
   const cardDetails = card ? (
     <div className="space-y-4 text-sm leading-relaxed">
       <div>
-        <p className="text-xs uppercase text-muted-foreground">Values</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          Values
+          <StabilityBadge field="values" />
+        </p>
         <p className="mt-1 text-base font-medium text-foreground">
           {card.values.join(" · ")}
         </p>
       </div>
       <div>
-        <p className="text-xs uppercase text-muted-foreground">6-month goal</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          6-month goal
+          <StabilityBadge field="sixMonthGoal" />
+        </p>
         <p className="mt-1 text-foreground">{card.sixMonthGoal}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-muted-foreground">5-year goal</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          5-year goal
+          <StabilityBadge field="fiveYearGoal" />
+        </p>
         <p className="mt-1 text-foreground">{card.fiveYearGoal}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-muted-foreground">Constraints</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          Constraints
+          <StabilityBadge field="constraints" />
+        </p>
         <p className="mt-1 text-foreground">{card.constraints}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-muted-foreground">Anti-goals</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          Anti-goals
+          <StabilityBadge field="antiGoals" />
+        </p>
         <p className="mt-1 text-foreground">{card.antiGoals}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-muted-foreground">Identity statement</p>
+        <p className="text-xs uppercase text-muted-foreground">
+          Identity statement
+          <StabilityBadge field="identityStmt" />
+        </p>
         <p className="mt-1 text-base italic text-foreground">“{card.identityStmt}”</p>
       </div>
     </div>
@@ -258,46 +310,13 @@ export function CardPanel({
               <span>Your card keeps the system anchored in your voice.</span>
             )}
           </div>
-          <Button size="sm" onClick={() => setIsDialogOpen(true)}>
-            {card ? "Edit card" : "Create card"}
-          </Button>
+          <div className="flex gap-2">
+            {card && <HistorySheet />}
+            <Button size="sm" onClick={() => setIsDialogOpen(true)}>
+              {card ? "Edit card" : "Create card"}
+            </Button>
+          </div>
         </CardFooter>
-        {card?.revisions?.length ? (
-          <>
-            <Separator />
-            <CardContent className="pt-4">
-              <p className="text-sm font-medium text-foreground">Recent revisions</p>
-              <ScrollArea className="mt-3 h-40 rounded-md border">
-                <div className="space-y-3 p-3 text-sm">
-                  {card.revisions.map((revision) => {
-                    const snapshot = revision.snapshot as Record<string, unknown>;
-                    return (
-                      <div key={revision.id} className="space-y-2 rounded-md bg-muted/40 p-3">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{formatTimestamp(revision.editedAt)}</span>
-                          <Badge variant="outline">Annotation</Badge>
-                        </div>
-                        <p className="text-sm text-foreground">{revision.annotation}</p>
-                        <Separator className="my-2" />
-                        <div className="grid gap-1 text-xs text-muted-foreground">
-                          {"values" in snapshot ? (
-                            <span>Values: {(snapshot.values as string[]).join(", ")}</span>
-                          ) : null}
-                          {"sixMonthGoal" in snapshot ? (
-                            <span>6m goal: {snapshot.sixMonthGoal as string}</span>
-                          ) : null}
-                          {"fiveYearGoal" in snapshot ? (
-                            <span>5y goal: {snapshot.fiveYearGoal as string}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </>
-        ) : null}
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

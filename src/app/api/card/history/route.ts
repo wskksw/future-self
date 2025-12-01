@@ -11,15 +11,25 @@ export async function GET() {
   });
 
   if (!card) {
-    return NextResponse.json({ revisions: [] });
+    return NextResponse.json({ revisions: [], currentCard: null });
   }
 
   const revisions = await prisma.cardRevision.findMany({
     where: { cardId: card.id },
     orderBy: { editedAt: "desc" },
-    take: 25,
+    take: 50, // Increased for better longitudinal view
   });
 
-  return NextResponse.json({ revisions });
+  // Include current card state for diffing latest revision → current
+  const currentCard = {
+    values: card.values,
+    sixMonthGoal: card.sixMonthGoal,
+    fiveYearGoal: card.fiveYearGoal,
+    constraints: card.constraints,
+    antiGoals: card.antiGoals,
+    identityStmt: card.identityStmt,
+  };
+
+  return NextResponse.json({ revisions, currentCard });
 }
 
